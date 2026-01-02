@@ -5,17 +5,17 @@ import { auth } from "@/auth";
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  // 1. FIX: Update type to Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
-    
-    // FIXED: Added check for !session.user
     if (!session || !session.user || session.user.role !== "admin") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    // 2. FIX: Await the params to get the ID
+    const { id } = await params;
     const body = await req.json();
 
     await connectDB();
@@ -34,6 +34,7 @@ export async function PUT(
 
     return NextResponse.json(updatedProduct);
   } catch (error) {
+    console.error("PUT Error:", error);
     return NextResponse.json(
       { message: "Error updating product" },
       { status: 500 }
@@ -43,17 +44,18 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  // 1. FIX: Update type to Promise
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
-    
-    // FIXED: Added check for !session.user
     if (!session || !session.user || session.user.role !== "admin") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    // 2. FIX: Await the params
+    const { id } = await params;
+    
     await connectDB();
 
     const deletedProduct = await Product.findByIdAndDelete(id);
@@ -67,6 +69,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Product deleted successfully" });
   } catch (error) {
+    console.error("DELETE Error:", error);
     return NextResponse.json(
       { message: "Error deleting product" },
       { status: 500 }
