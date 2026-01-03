@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+input, textarea, select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  -webkit-text-fill-color: #000000 !important; /* Fix for some browsers/autofill */
+}
+
+/* Optional: Fix placeholder color if that's also invisible */
+input::placeholder, textarea::placeholder {
+  color: #64748b !important; /* Slate-500 */
+  opacity: 1 !important;
+}
