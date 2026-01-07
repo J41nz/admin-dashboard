@@ -5,6 +5,8 @@ import { AuthError } from "next-auth";
 import connectToDatabase from "@/lib/db";
 import Product from "@/models/Product";
 import { revalidatePath } from "next/cache";
+import cloudinary from "@/lib/cloudinary"; // Import the config we just made
+import { redirect } from "next/navigation";
 
 // --- AUTHENTICATION ---
 export async function authenticate(prevState: string | undefined, formData: FormData) {
@@ -56,6 +58,19 @@ export async function getProductById(id: string) {
     }
 }
 
+// --- HELPER: UPLOAD TO CLOUDINARY ---
+async function uploadToCloudinary(imageString: string) {
+  try {
+    const uploadResponse = await cloudinary.uploader.upload(imageString, {
+      folder: "admin_dashboard_products", // Optional: keeps your cloudinary clean
+    });
+    return uploadResponse.secure_url;
+  } catch (error) {
+    console.error("Cloudinary Upload Error:", error);
+    throw new Error("Image upload failed");
+  }
+}
+
 // --- PRODUCT ACTIONS ---
 
 export async function createProduct(formData: FormData) {
@@ -65,19 +80,27 @@ export async function createProduct(formData: FormData) {
     const name = formData.get("name");
     const price = Number(formData.get("price"));
     const stock = Number(formData.get("stock"));
-    const image = formData.get("image"); 
+    const image = formData.get("image") as string; 
 
     if (!name || !price) throw new Error("Missing required fields");
 
-    await Product.create({ name, price, stock, sales: 0, image });
+    let imageUrl = "";
+    // Check if image exists and is a base64 string (starts with data:image)
+    if (image && image.startsWith("data:image")) {
+        imageUrl = await uploadToCloudinary(image);
+    } else {
+        imageUrl = image; // It might be a regular URL already
+    }
+
+    await Product.create({ name, price, stock, sales: 0, image: imageUrl });
     revalidatePath("/dashboard"); 
   } catch (error) {
     console.error("Database Error:", error);
     throw new Error("Failed to create product.");
   }
+  redirect("/dashboard");
 }
 
-// This is the function that was missing
 export async function updateProduct(formData: FormData) {
   try {
     await connectToDatabase();
@@ -86,14 +109,16 @@ export async function updateProduct(formData: FormData) {
     const name = formData.get("name");
     const price = Number(formData.get("price"));
     const stock = Number(formData.get("stock"));
-    const image = formData.get("image"); 
+    const image = formData.get("image") as string; 
 
     if (!id) throw new Error("Missing Product ID");
 
-    // Only update image if a new one is provided (string length > 0)
     const updateData: any = { name, price, stock };
-    if (image && image.toString().length > 0) {
-        updateData.image = image;
+
+    // Only upload if the image has changed (it's a new base64 string)
+    if (image && image.startsWith("data:image")) {
+        const imageUrl = await uploadToCloudinary(image);
+        updateData.image = imageUrl;
     }
 
     await Product.findByIdAndUpdate(id, updateData);
@@ -102,6 +127,7 @@ export async function updateProduct(formData: FormData) {
     console.error("Database Error:", error);
     throw new Error("Failed to update product.");
   }
+  redirect("/dashboard");
 }
 
 export async function deleteProduct(formData: FormData) {
